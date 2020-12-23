@@ -81,13 +81,13 @@ def plot_cluster(gdf: geopandas.GeoDataFrame, fig_location: str = None,
     gdf_plot = gdf.merge(centers, left_on="cls_lab", right_index=True).rename(columns={"p1": "count"}). \
         set_geometry("geometry_y")
 
-    gdf_plot = gdf_plot.to_crs("epsg:3857")
+    # gdf_plot = gdf_plot.to_crs("epsg:3857")
 
     # plot
     fig, ax = plt.subplots(1, 1, figsize=(9, 5))
     accidents.plot(ax=ax, markersize=3, color="tab:purple", alpha=0.3)
     gdf_plot.plot(ax=ax, markersize=gdf_plot["count"], column="count", legend=True, alpha=0.6)
-    ctx.add_basemap(ax, crs="epsg:3857", source=ctx.providers.Stamen.TonerLite, zoom=10, alpha=1)
+    ctx.add_basemap(ax, crs="epsg:5514", source=ctx.providers.Stamen.TonerLite, zoom=10, alpha=1)
 
     ax.set(ylabel='', xlabel='')
     ax.xaxis.set_visible(False)
