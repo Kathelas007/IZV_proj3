@@ -6,6 +6,7 @@ import sklearn.cluster
 import numpy as np
 import seaborn as sns
 import datetime
+import astral
 
 
 def convert_date(df: pd.DataFrame):
@@ -76,18 +77,51 @@ def fig_holidays(df):
     sns.set_style("darkgrid")
     x_names = ["Nový rok", "Velikonoční\npondělí", "Vánoce"]
     fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+
+    # plot bars
     sns.barplot(ax=ax, x=x_names, y=counts)
 
-    fig.savefig(f'holydays.png')
+    # plot avg
+    avg = [avg_accidents_per_day(df)] * 3
+    sns.lineplot(ax=ax, x=x_names, y=avg)
+
+    fig.savefig(f'holidays.png')
 
     plt.show()
     plt.close()
 
 
+def add_time_to_date(x):
+    return x['date'].replace(hour=x['hours'], minute=x['minutes'])
+
+
+def get_sunrise_sunset(date):
+    ...
+
+
+def tab_sunrise_sunset(df):
+    # full years only
+    df = df[df['date'] < pd.to_datetime(datetime.date(year=2020, month=1, day=1))]
+
+    df1 = df[['date', 'p2b']]
+
+    # create datetime
+    df1['hours'] = df1['p2b'].str.slice(0, 2).astype(int)
+    df1['minutes'] = df1['p2b'].str.slice(2, None).astype(int)
+
+    df1 = df1[(df1['hours'] < 24) & (df1['minutes'] < 60)]
+    df1['datetime'] = df1.apply(add_time_to_date, axis=1)
+
+    # get sunset / sunrise
+
+    print('a')
+
+
 def generate_data(df: pd.DataFrame):
     print(f'Average accident count per day:\t{avg_accidents_per_day(df)}')
     # fig_accidents_during_week(df)
-    fig_holidays(df)
+    # fig_holidays(df)
+    tab_sunrise_sunset(df)
 
 
 if __name__ == "__main__":
