@@ -7,6 +7,9 @@ import numpy as np
 import seaborn as sns
 import datetime
 import astral
+import astral.geocoder
+import astral.sun
+from scipy._lib.decorator import getfullargspec
 
 
 def convert_date(df: pd.DataFrame):
@@ -91,28 +94,58 @@ def fig_holidays(df):
     plt.close()
 
 
-def add_time_to_date(x):
-    return x['date'].replace(hour=x['hours'], minute=x['minutes'])
+#
+# def add_time_to_date(x):
+#     return x['date'].replace(hour=x['hours'], minute=x['minutes'])
+
+
+city = astral.geocoder.lookup("Prague", astral.geocoder.database())
 
 
 def get_sunrise_sunset(date):
-    ...
+    astral_data = astral.sun.sun(city.observer, date=date, tzinfo='Europe/Prague')
+    return [astral_data['sunrise'], astral_data['sunset']]
 
 
 def tab_sunrise_sunset(df):
     # full years only
     df = df[df['date'] < pd.to_datetime(datetime.date(year=2020, month=1, day=1))]
 
-    df1 = df[['date', 'p2b']]
-
-    # create datetime
-    df1['hours'] = df1['p2b'].str.slice(0, 2).astype(int)
-    df1['minutes'] = df1['p2b'].str.slice(2, None).astype(int)
-
-    df1 = df1[(df1['hours'] < 24) & (df1['minutes'] < 60)]
-    df1['datetime'] = df1.apply(add_time_to_date, axis=1)
+    # prepare
+    df1 = df[['date', 'p2b', 'p1']].groupby(['date', 'p2b']).count().reset_index()
+    df1.rename(columns={'p1': 'count'}, inplace=True)
+    df1['date'] = df1['date'].dt.tz_localize(tz='Europe/Prague')
 
     # get sunset / sunrise
+    df_ss = pd.DataFrame(df1['date'].unique(), columns=['date'])
+    df_ss['sunrise_sunset'] = df_ss['date'].apply(get_sunrise_sunset)
+    df_ss['sunrise'] = df_ss['sunrise_sunset'].apply(lambda x: x[0])
+    df_ss['sunset'] = df_ss['sunrise_sunset'].apply(lambda x: x[1])
+    df_ss.drop(['sunrise_sunset', ], axis=1, inplace=True)
+
+    # merge by date
+    dfm = df1.merge(df_ss, left_on='date', right_on='date')
+
+    # get full hours, minutes
+    dfm['hours'] = dfm['p2b'].str.slice(0, 2).astype(int)
+    dfm['minutes'] = dfm['p2b'].str.slice(2, None).astype(int)
+    dfm.drop(['p2b', ], axis=1, inplace=True)
+    # remove bad non-sence time
+    dfm = dfm[(dfm['hours'] < 24) & (dfm['minutes'] < 60)]
+
+    # add time to date
+    dfm['date'] = dfm['date'] + pd.to_timedelta(dfm['minutes'], 'm') + pd.to_timedelta(dfm['hours'], 'h')
+    dfm.drop(['hours', 'minutes'], axis=1, inplace=True)
+
+    # mark sunset(1) /sunrise(2) / other(0)
+    dfm['sunrise_diff'] = dfm['sunrise'] - dfm['date']
+    dfm['sunset_diff'] = dfm['date'] - dfm['sunset']
+
+    td_0 = pd.to_timedelta(0, 'h')
+    td_2 = pd.to_timedelta(2, 'h')
+    dfm['daytime'] = ((dfm['sunrise_diff'] > td_0) & (dfm['sunrise_diff'] < td_2)) * 1 + \
+                     ((dfm['sunset_diff'] > td_0) & (dfm['sunset_diff'] < td_2)) * 2
+    # dfm[['date', 'sunrise', 'sunrise_diff']]
 
     print('a')
 
