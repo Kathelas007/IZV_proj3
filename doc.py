@@ -113,7 +113,7 @@ def tab_sunrise_sunset(df):
 
     all_accidents_sum = len(df.index)
 
-    # prepare
+    # prepare, increase count by group by to speed up next calculations
     df1 = df[['date', 'p2b', 'p1']].groupby(['date', 'p2b']).count().reset_index()
     df1.rename(columns={'p1': 'count'}, inplace=True)
     df1['date'] = df1['date'].dt.tz_localize(tz='Europe/Prague')
@@ -166,11 +166,79 @@ def tab_sunrise_sunset(df):
     print(df_res)
 
 
+def tab_srss_01(df):
+    # todo obdobi
+
+    # full years only (2016-2019)
+    df = df[df['date'] < pd.to_datetime(datetime.date(year=2020, month=1, day=1))]
+    df = df[df['p5a'] == 2]  # lokalita mimo obec
+
+    # all_accidents_sum = len(df.index)
+
+    df['zver'] = df['p10'] == 4  # zavineni nehody lesni zveri
+
+    # prepare, increase count by group by to speed up next calculations
+    df1 = df[['date', 'p2b', 'p1', 'zver']].groupby(['date', 'p2b', 'zver']).count().reset_index()
+    df1.rename(columns={'p1': 'count'}, inplace=True)
+    df1['date'] = df1['date'].dt.tz_localize(tz='Europe/Prague')
+
+    # get sunset / sunrise time
+    df_ss = pd.DataFrame(df1['date'].unique(), columns=['date'])
+    df_ss['sunrise_sunset'] = df_ss['date'].apply(get_sunrise_sunset)
+    df_ss['sunrise'] = df_ss['sunrise_sunset'].apply(lambda x: x[0])
+    df_ss['sunset'] = df_ss['sunrise_sunset'].apply(lambda x: x[1])
+    df_ss.drop(['sunrise_sunset', ], axis=1, inplace=True)
+
+    # merge sunset / sunrise with other data by date
+    dfm = df1.merge(df_ss, left_on='date', right_on='date')
+
+    # get full hours, minutes
+    dfm['hours'] = dfm['p2b'].str.slice(0, 2).astype(int)
+    dfm['minutes'] = dfm['p2b'].str.slice(2, None).astype(int)
+    dfm.drop(['p2b', ], axis=1, inplace=True)
+    # remove bad non-sence time
+    dfm = dfm[(dfm['hours'] < 24) & (dfm['minutes'] < 60)]
+
+    # add time to date
+    dfm['date'] = dfm['date'] + pd.to_timedelta(dfm['minutes'], 'm') + pd.to_timedelta(dfm['hours'], 'h')
+    dfm.drop(['hours', 'minutes'], axis=1, inplace=True)
+
+    # add astronomical season
+    dfm['season'] = ((dfm['date'] + pd.to_timedelta(20, 'D')).dt.month % 12 + 3) // 3
+
+    # sount sunset / sunrise diff
+    dfm['sunrise_diff'] = dfm['sunrise'] - dfm['date']
+    dfm['sunset_diff'] = dfm['date'] - dfm['sunset']
+
+    # mark sunset(1) /sunrise(2) / other(0)
+    td_0 = pd.to_timedelta(0, 'h')
+    td_2 = pd.to_timedelta(1, 'h')
+    dfm['daytime'] = ((dfm['sunrise_diff'] > td_0) & (dfm['sunrise_diff'] < td_2)) * 1 + \
+                     ((dfm['sunset_diff'] > td_0) & (dfm['sunset_diff'] < td_2)) * 2
+    dfm = dfm[dfm['daytime'] > 0]
+
+    df_res = dfm[['count', 'daytime', 'season', 'zver']].groupby(['daytime', 'season', 'zver']).sum().reset_index()
+
+    # shape table properly
+    num_to_seasons = {1: "Winter", 2: "Spring", 3: "Summer", 4: "Autumn"}
+    num_to_daytime = {1: "Sunrise", 2: "Sunset"}
+    df_res = df_res.replace({'season': num_to_seasons, 'daytime': num_to_daytime})
+    df_res = df_res.pivot(columns='zver', index=['season', 'daytime'], values='count')
+
+    # counting percent
+    df_res['Total'] = df_res[True] + df_res[False]
+    df_res['Podil-zver'] = df_res[True] / (df_res['Total'] / 100)
+
+    # create google shaped table
+    df_tab = df_res['Podil-zver'].reset_index().pivot(columns='season', index='daytime', values='Podil-zver')
+    print(df_tab)
+
+
 def generate_data(df: pd.DataFrame):
-    #print(f'Average accident count per day:\t{avg_accidents_per_day(df)}')
+    # print(f'Average accident count per day:\t{avg_accidents_per_day(df)}')
     # fig_accidents_during_week(df)
     # fig_holidays(df)
-    tab_sunrise_sunset(df)
+    tab_srss_01(df)
 
 
 if __name__ == "__main__":
