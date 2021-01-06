@@ -33,6 +33,21 @@ def avg_accidents_per_day(df: pd.DataFrame):
     return avg_per_day
 
 
+yellow = '#fdb705'
+
+
+# yellow = '#fdbb05'
+
+
+# yellow = '#fdbf05'
+
+palette = sns.color_palette("bright")
+
+def make_tick_labels_white(xtick_labels, ytick_labels):
+    for tick in xtick_labels + ytick_labels:
+        tick.set_color('#ffffff')
+
+
 def fig_accidents_during_week(df: pd.DataFrame):
     """
     Function creates figures showing accident count during week
@@ -46,6 +61,8 @@ def fig_accidents_during_week(df: pd.DataFrame):
     max_y = 0
 
     sns.set_style('darkgrid')
+    # palette = sns.color_palette("bright")
+    # palette = sns.light_palette("#05fdaa", reverse=True, n_colors=7)
 
     # create plots
     for i in range(2):
@@ -54,9 +71,10 @@ def fig_accidents_during_week(df: pd.DataFrame):
         number_of_dates_in_df = len(df1['date'].unique())
         accidents_per_week_day_df = df1[['p1', 'weekday(p2a)']].groupby('weekday(p2a)').count().reset_index()
         accidents_per_week_day_df['p1'] = accidents_per_week_day_df['p1'] * 365 / number_of_dates_in_df
+        # rank = accidents_per_week_day_df['p1'].argsort().argsort()
 
-        fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-        sns.barplot(data=accidents_per_week_day_df, y='p1', x=day_names)
+        fig, ax = plt.subplots(1, 1, figsize=(3.5, 3.5))
+        sns.barplot(data=accidents_per_week_day_df, y='p1', x=day_names, palette=palette)
 
         axes.append(ax)
         figs.append(fig)
@@ -66,9 +84,10 @@ def fig_accidents_during_week(df: pd.DataFrame):
     for i in range(2):
         axes[i].set_ylabel('počet')
         axes[i].set_title(titles[i])
+        make_tick_labels_white(ax.get_xticklabels(), ax.get_yticklabels())
         # axes[i].set_ylim(top=max_y * 1.2)
 
-        figs[i].savefig(f'weekday_{i + 1}.png')
+        figs[i].savefig(f'weekday_{i + 1}.png', transparent=True)
 
     plt.show()
     plt.close()
@@ -101,13 +120,15 @@ def fig_holidays(df: pd.DataFrame):
     fig, ax = plt.subplots(1, 1, figsize=(4, 4))
 
     # plot bars
-    sns.barplot(ax=ax, x=x_names, y=counts)
+    sns.barplot(ax=ax, x=x_names, y=counts, palette=palette)
+
+    make_tick_labels_white(ax.get_xticklabels(), ax.get_yticklabels())
 
     # plot avg
     avg = [avg_accidents_per_day(df)] * 3
     sns.lineplot(ax=ax, x=x_names, y=avg)
 
-    fig.savefig(f'holidays.png')
+    fig.savefig(f'holidays.png', transparent=True)
 
     plt.show()
     plt.close()
@@ -199,7 +220,7 @@ def generate_data(df: pd.DataFrame):
     print(f'Average accident count per day:\t{avg_accidents_per_day(df)}')
     fig_accidents_during_week(df)
     fig_holidays(df)
-    print('\n' + tab_sunrise_sunset(df))
+    print('\n', tab_sunrise_sunset(df))
 
 
 if __name__ == '__main__':
