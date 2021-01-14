@@ -37,11 +37,11 @@ yellow = '#fdb705'
 
 
 # yellow = '#fdbb05'
-
-
 # yellow = '#fdbf05'
 
-palette = sns.color_palette("bright")
+
+# palette = sns.color_palette("bright")
+
 
 def make_tick_labels_white(xtick_labels, ytick_labels):
     for tick in xtick_labels + ytick_labels:
@@ -54,43 +54,44 @@ def fig_accidents_during_week(df: pd.DataFrame):
     :param df: input dataFrame
     """
     day_names = ['PO', 'ÚT', 'ST', 'ČT', 'PÁ', 'SO', 'NE']
-    titles = ['V obci', 'Mimo obec']
+    df1 = df[['p5a', 'p1', 'weekday(p2a)']].groupby(['p5a', 'weekday(p2a)']).count().reset_index()
+    df1['p1'] = df1['p1'] / (365)
 
-    axes = []
-    figs = []
-    max_y = 0
+    # replace
+    str_range = [str(i) for i in range(7)]
+    days = dict(zip(str_range, day_names))
+    locations = {1: 'V obci', 2: 'Mimo obec'}
+    df1 = df1.replace({'p5a': locations, 'weekday(p2a)': days})
+    df1.rename(columns={'p1': 'počet', 'p5a': 'lokalita'}, inplace=True)
 
-    sns.set_style('darkgrid')
-    # palette = sns.color_palette("bright")
-    # palette = sns.light_palette("#05fdaa", reverse=True, n_colors=7)
+    # set style
+    sns.set_style('darkgrid', {'text.color': 'white'})
+    palette = sns.set_palette(sns.color_palette(['tab:red', 'tab:blue']))
 
-    # create plots
-    for i in range(2):
-        df1 = df[df['p5a'] == i + 1]
+    # plot
+    fig, ax = plt.subplots(1, 1, figsize=(4.2, 3))
+    sns.barplot(data=df1, y='počet', hue='lokalita', x='weekday(p2a)', palette=palette)
 
-        number_of_dates_in_df = len(df1['date'].unique())
-        accidents_per_week_day_df = df1[['p1', 'weekday(p2a)']].groupby('weekday(p2a)').count().reset_index()
-        accidents_per_week_day_df['p1'] = accidents_per_week_day_df['p1'] * 365 / number_of_dates_in_df
-        # rank = accidents_per_week_day_df['p1'].argsort().argsort()
-
-        fig, ax = plt.subplots(1, 1, figsize=(3.5, 3.5))
-        sns.barplot(data=accidents_per_week_day_df, y='p1', x=day_names, palette=palette)
-
-        axes.append(ax)
-        figs.append(fig)
-        max_y = max(max_y, accidents_per_week_day_df['p1'].max())
-
-    # style plots
-    for i in range(2):
-        axes[i].set_ylabel('počet')
-        axes[i].set_title(titles[i])
-        make_tick_labels_white(ax.get_xticklabels(), ax.get_yticklabels())
-        # axes[i].set_ylim(top=max_y * 1.2)
-
-        figs[i].savefig(f'weekday_{i + 1}.png', transparent=True)
+    # axes style
+    ax.set_ylabel('počet', color='#ffffff')
+    ax.set_xlabel(None)
+    ax.set_ylim(top=200)
+    make_tick_labels_white(ax.get_xticklabels(), ax.get_yticklabels())
+    ax.get_legend().set_title(None)
+    fig.savefig(f'week.png', transparent=True)
 
     plt.show()
     plt.close()
+
+
+def count_alcohol_percent_on_new_year(df: pd.DataFrame):
+    ny_df = df[df['holidays'] == 'Nový rok']
+
+    total = len(ny_df.index)
+    # alcohol_count = len(ny_df[ny_df['p57'].isin([4, 5])].index)
+    alcohol_count = len(ny_df[ny_df['p11'].isin([1, 3, 5, 6, 7, 8, 9])].index)
+
+    return alcohol_count / (total / 100)
 
 
 def fig_holidays(df: pd.DataFrame):
@@ -110,28 +111,41 @@ def fig_holidays(df: pd.DataFrame):
 
     # get avg counts for holidays
     holidays = [new_years, easter_mondays, christmas]
-    counts = []
-    for holiday in holidays:
-        count = df[df['date'].isin(holiday)]['p1'].count() / 4
-        counts.append(count)
+    labels = ['Nový rok', 'Velikonoční pondělí', 'Vánoce']
 
-    sns.set_style('darkgrid')
+    # mark holidays
+    df['holidays'] = np.nan
+    for holiday, label in zip(holidays, labels):
+        df.loc[df['date'].isin(holiday), "holidays"] = label
+
+    # mark alcohol
+    alcohol_ny = count_alcohol_percent_on_new_year(df)
+
+    # count number of occurenc
+    df_plot = df[['holidays', 'p1']].groupby(['holidays']).count()
+    df_plot['p1'] = df_plot['p1'] / 4
+    df_plot.rename(columns={'p1': 'počet'}, inplace=True)
+
+    # set styles
+    sns.set_style('darkgrid', {'text.color': 'white'})
+    palette = sns.set_palette(sns.color_palette(['tab:blue', 'tab:green', 'tab:red']))
+
     x_names = ['Nový rok', 'Velikonoční\npondělí', 'Vánoce']
-    fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+    fig, ax = plt.subplots(1, 1, figsize=(3.2, 3.6))
 
     # plot bars
-    sns.barplot(ax=ax, x=x_names, y=counts, palette=palette)
+    sns.barplot(ax=ax, x=x_names, y=df_plot['počet'], palette=palette)
 
+    # style axis
+    ax.set_ylabel('počet', color='#ffffff')
     make_tick_labels_white(ax.get_xticklabels(), ax.get_yticklabels())
-
-    # plot avg
-    avg = [avg_accidents_per_day(df)] * 3
-    sns.lineplot(ax=ax, x=x_names, y=avg)
 
     fig.savefig(f'holidays.png', transparent=True)
 
     plt.show()
     plt.close()
+
+    return alcohol_ny
 
 
 city = astral.geocoder.lookup('Prague', astral.geocoder.database())
@@ -219,7 +233,7 @@ def tab_sunrise_sunset(df: pd.DataFrame) -> pd.DataFrame:
 def generate_data(df: pd.DataFrame):
     print(f'Average accident count per day:\t{avg_accidents_per_day(df)}')
     fig_accidents_during_week(df)
-    fig_holidays(df)
+    print(f'Percent of alcohol on NY:\t{fig_holidays(df)}')
     print('\n', tab_sunrise_sunset(df))
 
 
