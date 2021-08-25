@@ -1,4 +1,4 @@
-# IZV_proj2 - Accidents
+# IZV_proj3 - Accidents
 
 Infographic based on data analysis.
 
